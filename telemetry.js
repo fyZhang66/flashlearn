@@ -28,9 +28,6 @@ try {
   console.error("OTel SDK failed to start:", err);
 }
 
-process.on("SIGTERM", () => {
-  sdk
-    .shutdown()
-    .catch((err) => console.error("OTel shutdown failed", err))
-    .finally(() => process.exit(0));
-});
+// Share the SDK so server.js can participate in a single, awaited shutdown
+// path rather than racing us on SIGTERM.
+globalThis.__otelSdk = sdk;

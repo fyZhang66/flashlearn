@@ -8,8 +8,12 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const migrationsDir = path.join(__dirname, "..", "migrations");
 
-async function ensureTable() {
-  await pool.query(`
+// Fixed advisory-lock key so concurrent migrators (e.g. several replicas
+// coming up at once) serialize on the same key rather than racing.
+const LOCK_KEY = 4216547298n;
+
+async function ensureTable(client) {
+  await client.query(`
     CREATE TABLE IF NOT EXISTS schema_migrations (
       filename   TEXT        PRIMARY KEY,
       applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -17,48 +21,63 @@ async function ensureTable() {
   `);
 }
 
-async function applied() {
-  const { rows } = await pool.query("SELECT filename FROM schema_migrations");
+async function applied(client) {
+  const { rows } = await client.query(
+    "SELECT filename FROM schema_migrations",
+  );
   return new Set(rows.map((r) => r.filename));
 }
 
 async function run() {
-  // pgcrypto is enabled inside 001_init.sql; run CREATE EXTENSION before that
-  // inside the migration so we don't need superuser here.
-  await ensureTable();
-  const done = await applied();
+  const lockClient = await pool.connect();
+  let haveLock = false;
+  try {
+    await lockClient.query("SELECT pg_advisory_lock($1)", [LOCK_KEY.toString()]);
+    haveLock = true;
 
-  const files = (await fs.readdir(migrationsDir))
-    .filter((f) => f.endsWith(".sql"))
-    .sort();
+    await ensureTable(lockClient);
+    const done = await applied(lockClient);
 
-  for (const file of files) {
-    if (done.has(file)) {
-      logger.info({ file }, "migration already applied");
-      continue;
+    const files = (await fs.readdir(migrationsDir))
+      .filter((f) => f.endsWith(".sql"))
+      .sort();
+
+    for (const file of files) {
+      if (done.has(file)) {
+        logger.info({ file }, "migration already applied");
+        continue;
+      }
+      const sql = await fs.readFile(path.join(migrationsDir, file), "utf8");
+      logger.info({ file }, "applying migration");
+
+      try {
+        await lockClient.query("BEGIN");
+        await lockClient.query(sql);
+        await lockClient.query(
+          "INSERT INTO schema_migrations (filename) VALUES ($1)",
+          [file],
+        );
+        await lockClient.query("COMMIT");
+        logger.info({ file }, "migration applied");
+      } catch (err) {
+        await lockClient.query("ROLLBACK");
+        logger.error({ err, file }, "migration failed");
+        throw err;
+      }
     }
-    const sql = await fs.readFile(path.join(migrationsDir, file), "utf8");
-    logger.info({ file }, "applying migration");
-    const client = await pool.connect();
-    try {
-      await client.query("BEGIN");
-      await client.query(sql);
-      await client.query(
-        "INSERT INTO schema_migrations (filename) VALUES ($1)",
-        [file],
-      );
-      await client.query("COMMIT");
-      logger.info({ file }, "migration applied");
-    } catch (err) {
-      await client.query("ROLLBACK");
-      logger.error({ err, file }, "migration failed");
-      throw err;
-    } finally {
-      client.release();
+  } finally {
+    if (haveLock) {
+      try {
+        await lockClient.query("SELECT pg_advisory_unlock($1)", [
+          LOCK_KEY.toString(),
+        ]);
+      } catch (err) {
+        logger.warn({ err }, "advisory unlock failed");
+      }
     }
+    lockClient.release();
+    await pool.end();
   }
-
-  await pool.end();
 }
 
 run().catch((err) => {

@@ -110,15 +110,19 @@ Manifests use **kustomize** with a shared `base/` and two overlays:
 
 - `overlays/dev/` — uses the locally-built `flashlearn-app:local` image
   (loaded into kind via `kind load docker-image`), 1 replica for sanity.
-- `overlays/prod/` — points at `ghcr.io/fyzhang66/flashlearn`; CD
-  pipeline's `kubectl set image` overrides the tag to the build SHA.
+- `overlays/prod/` — points at `ghcr.io/fyzhang66/flashlearn:latest`; CD
+  pins the tag to the build SHA in the runner's workspace before
+  `kubectl apply -k`.
 
 Resource shape:
 
 - **Postgres** as a StatefulSet with a 1 Gi PVC, so the pod can be
   recycled without losing data.
-- **Migrate** as a Job with `ttlSecondsAfterFinished: 600` — the K8s
-  analogue of compose's init container.
+- **Migrations as an initContainer** on the app Deployment, not as a
+  separate Job. A Job + Deployment are independent in k8s — the app can
+  roll out before the schema exists. An initContainer ties pod Ready-ness
+  to migration success. `scripts/migrate.js` uses a `pg_advisory_lock` so
+  concurrent pods don't race.
 - **App** as a Deployment with 2 replicas by default,
   `startupProbe`/`readinessProbe`/`livenessProbe` hitting the actual
   probe endpoints (readiness also pings the DB so a k8s Service drops a
@@ -150,11 +154,15 @@ the Docker image with GHA layer cache and pushes two tags to GHCR:
 `packages: write`.
 
 **`cd.yml` on a self-hosted runner on my laptop.** Triggered by
-`workflow_run` when CI succeeds on `main`. Pulls the image, `kind load
-docker-image`s it into the cluster, `kubectl set image`s the
-deployment, annotates it with a change-cause containing the SHA, then
-blocks on `rollout status`. A `concurrency: cd` group serializes
-deploys so an older push can't land on top of a newer one.
+`workflow_run` when CI succeeds on `main`. Checks out the repo at the
+built SHA, pulls the new image and `kind load`s it, pins the prod
+overlay's image tag to that SHA via an ephemeral `sed` on
+`kustomization.yaml`, then runs `kubectl apply -k k8s/overlays/prod` so
+every manifest (ConfigMap, Secret, HPA, Ingress — not just the image)
+is reconciled on each deploy. `rollout status` blocks until the
+Deployment's migrate initContainer and app container are both healthy.
+A `concurrency: cd` group serializes deploys so an older push can't
+land on top of a newer one.
 
 The self-hosted runner is the load-bearing piece: the cluster lives on
 my laptop, so the deploy has to come from my laptop. This is cheaper

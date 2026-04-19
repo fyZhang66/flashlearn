@@ -83,14 +83,54 @@ if (isMain) {
     logger.info({ port: PORT }, "flashlearn server listening");
   });
 
+  // Single drain path on termination:
+  //   1. stop accepting new connections + wait for in-flight requests
+  //   2. flush telemetry (if loaded via --import ./telemetry.js)
+  //   3. close the DB pool
+  //   4. exit
+  // A watchdog forces exit if any step hangs past SHUTDOWN_TIMEOUT_MS.
+  const SHUTDOWN_TIMEOUT_MS = Number(process.env.SHUTDOWN_TIMEOUT_MS || 30_000);
+  let shuttingDown = false;
+
+  const drainHttp = () =>
+    new Promise((resolve) => {
+      server.close((err) => {
+        if (err) logger.error({ err }, "http server close error");
+        else logger.info("http server closed");
+        resolve();
+      });
+    });
+
   const shutdown = async (signal) => {
+    if (shuttingDown) return;
+    shuttingDown = true;
     logger.info({ signal }, "shutting down");
-    server.close(() => logger.info("http server closed"));
+
+    const watchdog = setTimeout(() => {
+      logger.error({ ms: SHUTDOWN_TIMEOUT_MS }, "shutdown watchdog; force-exiting");
+      process.exit(1);
+    }, SHUTDOWN_TIMEOUT_MS);
+    watchdog.unref();
+
+    try {
+      await drainHttp();
+    } catch (err) {
+      logger.error({ err }, "error draining http");
+    }
+
+    try {
+      await globalThis.__otelSdk?.shutdown();
+    } catch (err) {
+      logger.warn({ err }, "telemetry shutdown error");
+    }
+
     try {
       await closeDb();
     } catch (err) {
       logger.error({ err }, "error closing db");
     }
+
+    clearTimeout(watchdog);
     process.exit(0);
   };
 

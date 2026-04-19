@@ -15,3 +15,14 @@ patches:
     target:
       kind: Deployment
       name: app
+  # HPA's minReplicas=2 would otherwise fight the "1 replica in dev"
+  # intent — drop the HPA from the dev overlay entirely.
+  - patch: |-
+      $patch: delete
+      apiVersion: autoscaling/v2
+      kind: HorizontalPodAutoscaler
+      metadata:
+        name: app
+    target:
+      kind: HorizontalPodAutoscaler
+      name: app

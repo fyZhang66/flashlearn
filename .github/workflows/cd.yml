@@ -26,8 +26,13 @@ jobs:
       CLUSTER_CONTEXT: kind-flashlearn
       NAMESPACE: flashlearn
       DEPLOYMENT: app
-      CONTAINER: app
+      OVERLAY: k8s/overlays/prod
     steps:
+      - name: Check out the built commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
       - name: Resolve image
         id: img
         run: |
@@ -45,11 +50,23 @@ jobs:
       - name: Load into kind
         run: kind load docker-image "${{ steps.img.outputs.image }}" --name flashlearn
 
-      - name: Roll out new image
+      - name: Pin image tag in overlay
+        # Overwrite the checkout's kustomization.yaml so the generated
+        # manifests reference this exact SHA. The edit is ephemeral (the
+        # runner workspace is discarded); the committed file stays at
+        # `:latest`.
+        working-directory: ${{ env.OVERLAY }}
         run: |
-          kubectl --context "$CLUSTER_CONTEXT" -n "$NAMESPACE" \
-            set image "deployment/$DEPLOYMENT" \
-            "$CONTAINER=${{ steps.img.outputs.image }}"
+          sed -i -E "s#(newTag:).*#\\1 ${{ steps.img.outputs.sha }}#" kustomization.yaml
+          cat kustomization.yaml
+
+      - name: Reconcile manifests
+        # Applies Namespace, Secret, ConfigMap, Postgres StatefulSet +
+        # Service, app Deployment (with migrate initContainer), Service,
+        # HPA, and Ingress. The Deployment won't become Ready until the
+        # initContainer has successfully applied migrations.
+        run: |
+          kubectl --context "$CLUSTER_CONTEXT" apply -k "$OVERLAY"
 
       - name: Annotate rollout with SHA
         run: |

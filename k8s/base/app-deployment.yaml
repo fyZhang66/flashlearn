@@ -24,9 +24,30 @@ spec:
         prometheus.io/port: "3000"
         prometheus.io/path: "/metrics"
     spec:
+      # Gate pod startup on schema readiness. A pod cannot reach the "app"
+      # container (and therefore cannot become Ready) until migrations have
+      # succeeded. Advisory-lock in scripts/migrate.js serializes concurrent
+      # pods so only one actually applies migrations; the others no-op and
+      # exit 0.
+      initContainers:
+        - name: migrate
+          image: flashlearn-app
+          imagePullPolicy: IfNotPresent
+          command: ["node", "scripts/migrate.js"]
+          env:
+            - name: LOG_LEVEL
+              value: info
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-credentials
+                  key: DATABASE_URL
+          resources:
+            requests: { cpu: 50m, memory: 64Mi }
+            limits: { cpu: 200m, memory: 128Mi }
       containers:
         - name: app
-          image: flashlearn-app:local
+          image: flashlearn-app
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
@@ -69,3 +90,4 @@ spec:
             preStop:
               exec:
                 command: ["/bin/sh", "-c", "sleep 5"]
+      terminationGracePeriodSeconds: 45

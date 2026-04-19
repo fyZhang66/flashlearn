@@ -108,10 +108,9 @@ Host (macOS)                kind cluster (in Docker)
                            │  │  StatefulSet: postgres + PVC │    │
                            │  └──────────────────────────────┘    │
                            │                                      │
-                           │  ┌──────────────────────────────┐    │
-                           │  │  Job: migrate (one-shot)     │    │
-                           │  │  ttlSecondsAfterFinished=600 │    │
-                           │  └──────────────────────────────┘    │
+                           │  (migrations run as an initContainer │
+                           │   inside each app pod; advisory lock │
+                           │   in scripts/migrate.js serializes)  │
                            │                                      │
                            │  Secret: postgres-credentials        │
                            │  ConfigMap: app-config               │
@@ -123,9 +122,22 @@ Host (macOS)                kind cluster (in Docker)
                           GitHub self-hosted runner on laptop
 ```
 
+The self-hosted runner checks out the repo at the built SHA, pins the
+prod overlay's image tag to that SHA via an ephemeral `sed` on
+`kustomization.yaml`, then does `kubectl apply -k k8s/overlays/prod` so
+ConfigMap / Secret / HPA / Ingress drift stays impossible; the final
+`rollout status` blocks until the Deployment (including its migrate
+initContainer) is healthy.
+
 Key points:
 
 - **StatefulSet + PVC** for Postgres so data survives pod recycling.
+- **Migrations as an initContainer**, not a Job. A Job + Deployment are
+  independent in k8s, so a fresh cluster can roll out the app before
+  the schema exists. Putting the migration in an initContainer gates pod
+  Ready-ness on migration success. `scripts/migrate.js` takes a
+  `pg_advisory_lock` so concurrent pods serialize safely — only one
+  actually applies, the others no-op and exit 0.
 - **Probes** match the reality of the app: `startupProbe` to absorb slow
   cold starts, `readinessProbe` that actually pings the DB (`/readyz`),
   `livenessProbe` that's cheap (`/healthz`).

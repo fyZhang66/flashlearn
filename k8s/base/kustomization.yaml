@@ -8,7 +8,6 @@ resources:
   - postgres-secret.yaml
   - postgres-statefulset.yaml
   - postgres-service.yaml
-  - migrate-job.yaml
   - app-configmap.yaml
   - app-deployment.yaml
   - app-service.yaml
