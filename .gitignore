@@ -1,0 +1,43 @@
+# Dependencies
+node_modules
+
+# Build output
+dist
+dist-ssr
+*.local
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Env & secrets
+.env
+.env.*
+!.env.example
+
+# Test artifacts
+coverage
+.nyc_output
+
+# Editor / OS
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# k8s local state
+kubeconfig
+*.kubeconfig
+
+# GitHub Actions self-hosted runner (if installed inside repo)
+actions-runner/

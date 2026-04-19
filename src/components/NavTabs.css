@@ -1,0 +1,138 @@
+.user-controls {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+.app-nav {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.nav-tab {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  border: none;
+  border-radius: 8px;
+  background-color: transparent;
+  color: var(--apple-text-secondary);
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.nav-tab:hover {
+  background-color: rgba(0, 0, 0, 0.05);
+  color: var(--apple-text);
+}
+
+.nav-tab.active {
+  background-color: rgba(0, 113, 227, 0.1);
+  color: var(--apple-blue);
+}
+
+.nav-tab.active svg {
+  color: var(--apple-blue);
+}
+
+.badge {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  background-color: var(--apple-red);
+  color: white;
+  border-radius: 8px;
+  padding: 0 6px;
+  font-size: 0.75rem;
+  font-weight: bold;
+  min-width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.welcome-message {
+  margin-left: auto;
+  color: var(--apple-text);
+}
+
+.username {
+  font-weight: 600;
+  color: var(--apple-blue);
+}
+
+.logout-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  border: none;
+  border-radius: 8px;
+  background-color: var(--apple-blue);
+  color: white;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.logout-btn:hover {
+  background-color: #e0352b;
+  transform: translateY(-1px);
+}
+
+.logout-btn:active {
+  background-color: #cc2f26;
+  transform: translateY(0);
+}
+
+@media (max-width: 768px) {
+  .user-controls {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.8rem;
+    width: 100%;
+  }
+  
+  .app-nav {
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+  
+  .nav-tab {
+    padding: 0.4rem 0.8rem;
+    font-size: 0.9rem;
+  }
+  
+  .welcome-message {
+    text-align: center;
+    margin-left: 0;
+    font-size: 0.9rem;
+  }
+  
+  .logout-btn {
+    width: 120px;
+    margin: 0 auto;
+    justify-content: center;
+  }
+}
+
+@media (max-width: 480px) {
+  .app-nav {
+    gap: 0.3rem;
+  }
+  
+  .nav-tab {
+    padding: 0.3rem 0.6rem;
+    font-size: 0.8rem;
+  }
+  
+  .badge {
+    min-width: 16px;
+    height: 16px;
+    font-size: 0.7rem;
+  }
+}

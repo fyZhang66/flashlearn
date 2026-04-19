@@ -1,0 +1,229 @@
+.create-card-collapsed {
+  display: flex;
+  justify-content: center;
+  margin: 20px 0;
+}
+
+.create-card-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background-color: var(--apple-blue);
+  color: white;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: 0 2px 8px rgba(0, 113, 227, 0.2);
+}
+
+.create-card-btn:hover {
+  background-color: var(--apple-blue-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 113, 227, 0.3);
+}
+
+.create-card-btn:active {
+  background-color: var(--apple-blue-active);
+  transform: translateY(0);
+}
+
+.create-card-page {
+  width: 100%;
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 30px;
+}
+
+.create-card-container {
+  width: 100%;
+  background-color: white;
+  border-radius: 12px;
+  padding: 30px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+}
+
+.create-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+.create-card-header h2 {
+  color: var(--apple-blue);
+  font-size: 24px;
+  font-weight: 500;
+  margin: 0;
+}
+
+.close-btn {
+  background: none;
+  border: none;
+  color: var(--apple-text-secondary);
+  cursor: pointer;
+  padding: 5px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.2s;
+}
+
+.close-btn:hover {
+  background-color: rgba(0, 0, 0, 0.05);
+}
+
+.card-error {
+  background-color: #fff2f2;
+  color: var(--apple-red);
+  padding: 12px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  font-size: 14px;
+  border: 1px solid rgba(255, 59, 48, 0.2);
+}
+
+.card-success {
+  background-color: #e8f5e9;
+  color: #2e7d32;
+  padding: 12px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  font-size: 14px;
+  border: 1px solid rgba(46, 125, 50, 0.2);
+}
+
+.create-card-form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.form-group label {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--apple-text);
+}
+
+.form-group input,
+.form-group textarea {
+  padding: 14px;
+  border: 1px solid var(--apple-border);
+  border-radius: 8px;
+  font-size: 16px;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.form-group input:focus,
+.form-group textarea:focus {
+  outline: none;
+  border-color: var(--apple-blue);
+  box-shadow: 0 0 0 3px rgba(0, 113, 227, 0.2);
+}
+
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 10px;
+}
+
+.btn {
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: none;
+}
+
+.btn-primary {
+  background-color: var(--apple-blue);
+  color: white;
+}
+
+.btn-primary:hover {
+  background-color: var(--apple-blue-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0, 113, 227, 0.1);
+}
+
+.btn-primary:active {
+  background-color: var(--apple-blue-active);
+  transform: translateY(0);
+}
+
+.btn-secondary {
+  background-color: #f5f5f7;
+  color: var(--apple-text);
+  border: 1px solid var(--apple-border);
+}
+
+.btn-secondary:hover {
+  background-color: #e5e5ea;
+}
+
+.btn-secondary:active {
+  background-color: #d8d8df;
+}
+
+.btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+  transform: none;
+}
+
+
+.create-card-tips {
+  background-color: white;
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+}
+
+.create-card-tips h3 {
+  color: var(--apple-blue);
+  font-size: 18px;
+  font-weight: 500;
+  margin-top: 0;
+  margin-bottom: 16px;
+}
+
+.create-card-tips ul {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.create-card-tips li {
+  margin-bottom: 10px;
+  line-height: 1.5;
+  color: var(--apple-text);
+}
+
+@media (max-width: 768px) {
+  .create-card-container {
+    padding: 20px;
+  }
+  
+  .form-actions {
+    flex-direction: column-reverse;
+  }
+  
+  .btn {
+    width: 100%;
+  }
+}
