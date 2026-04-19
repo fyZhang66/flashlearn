@@ -64,6 +64,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
       - name: Set up Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -86,6 +89,9 @@ jobs:
           context: .
           file: docker/Dockerfile
           push: true
+          # Build both so the self-hosted runner (Apple Silicon) and any
+          # amd64 deployment target can pull the same tag.
+          platforms: linux/amd64,linux/arm64
           cache-from: type=gha
           cache-to: type=gha,mode=max
           tags: |
