@@ -36,7 +36,9 @@ jobs:
       - name: Resolve image
         id: img
         run: |
-          owner="${GITHUB_REPOSITORY_OWNER,,}"
+          # `${VAR,,}` is bash 4+; macOS ships bash 3.2 on self-hosted runners,
+          # so lowercase via tr instead.
+          owner=$(echo "$GITHUB_REPOSITORY_OWNER" | tr '[:upper:]' '[:lower:]')
           sha="${{ github.event.workflow_run.head_sha }}"
           echo "image=ghcr.io/${owner}/flashlearn:${sha}" >> "$GITHUB_OUTPUT"
           echo "sha=${sha}" >> "$GITHUB_OUTPUT"
