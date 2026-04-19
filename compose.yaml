@@ -1,0 +1,177 @@
+name: flashlearn
+
+services:
+  # ── Postgres ──────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: flashlearn-postgres
+    environment:
+      POSTGRES_DB: flashlearn
+      POSTGRES_USER: flashlearn
+      POSTGRES_PASSWORD: flashlearn
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U flashlearn -d flashlearn"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks: [flashlearn]
+
+  # ── App image build (one-shot; runs migrations then exits) ────────────
+  migrate:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    image: flashlearn-app:local
+    container_name: flashlearn-migrate
+    command: ["node", "scripts/migrate.js"]
+    environment:
+      DATABASE_URL: postgres://flashlearn:flashlearn@postgres:5432/flashlearn
+      LOG_LEVEL: info
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [flashlearn]
+    restart: "no"
+
+  # ── App ───────────────────────────────────────────────────────────────
+  app:
+    image: flashlearn-app:local
+    container_name: flashlearn-app
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+      otel-collector:
+        condition: service_started
+    environment:
+      DATABASE_URL: postgres://flashlearn:flashlearn@postgres:5432/flashlearn
+      OTEL_SERVICE_NAME: flashlearn
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+      LOG_LEVEL: info
+      PORT: "3000"
+    ports:
+      - "3000:3000"
+    logging:
+      driver: fluentd
+      options:
+        fluentd-address: "localhost:24224"
+        tag: "docker.app"
+        fluentd-async: "true"
+    networks: [flashlearn]
+
+  # ── Prometheus ────────────────────────────────────────────────────────
+  prometheus:
+    image: prom/prometheus:v2.47.0
+    container_name: flashlearn-prometheus
+    volumes:
+      - ./observability/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--web.enable-lifecycle"
+    ports:
+      - "9090:9090"
+    networks: [flashlearn]
+
+  # ── Grafana ───────────────────────────────────────────────────────────
+  grafana:
+    image: grafana/grafana:10.2.0
+    container_name: flashlearn-grafana
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    ports:
+      - "3001:3000"
+    depends_on: [prometheus]
+    networks: [flashlearn]
+
+  # ── Elasticsearch ─────────────────────────────────────────────────────
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
+    container_name: flashlearn-elasticsearch
+    environment:
+      discovery.type: single-node
+      xpack.security.enabled: "false"
+      ES_JAVA_OPTS: "-Xms512m -Xmx512m"
+    volumes:
+      - es-data:/usr/share/elasticsearch/data
+    ports:
+      - "9200:9200"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:9200/_cluster/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks: [flashlearn]
+
+  # ── Kibana ────────────────────────────────────────────────────────────
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.11.0
+    container_name: flashlearn-kibana
+    environment:
+      ELASTICSEARCH_HOSTS: http://elasticsearch:9200
+    ports:
+      - "5601:5601"
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    networks: [flashlearn]
+
+  # ── Fluent Bit (log shipper; receives via Docker fluentd driver) ──────
+  fluent-bit:
+    image: fluent/fluent-bit:2.2
+    container_name: flashlearn-fluent-bit
+    volumes:
+      - ./observability/fluent-bit/fluent-bit.conf:/fluent-bit/etc/fluent-bit.conf:ro
+      - ./observability/fluent-bit/parsers.conf:/fluent-bit/etc/parsers.conf:ro
+    ports:
+      - "24224:24224"
+      - "24224:24224/udp"
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    networks: [flashlearn]
+
+  # ── OpenTelemetry Collector ───────────────────────────────────────────
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.89.0
+    container_name: flashlearn-otel
+    volumes:
+      - ./observability/otel/otel-collector-config.yml:/etc/otelcol-contrib/config.yaml:ro
+    ports:
+      - "4317:4317"
+      - "4318:4318"
+    depends_on: [jaeger]
+    networks: [flashlearn]
+
+  # ── Jaeger (traces UI) ────────────────────────────────────────────────
+  jaeger:
+    image: jaegertracing/all-in-one:1.51
+    container_name: flashlearn-jaeger
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+    ports:
+      - "16686:16686"
+      - "14268:14268"
+    networks: [flashlearn]
+
+volumes:
+  postgres-data:
+  prometheus-data:
+  grafana-data:
+  es-data:
+
+networks:
+  flashlearn:
+    driver: bridge
