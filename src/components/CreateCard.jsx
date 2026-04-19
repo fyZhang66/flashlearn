@@ -30,13 +30,13 @@ function CreateCard() {
         setIsLoading(true);
         
         api.addCard(front, explain)
-            .then(card => {
+            .then(_card => {
                 setSuccess('Card created successfully!');
                 setFront('');
                 setExplain('');
                 fetchStats();
             })
-            .catch(err => {
+            .catch((_err) => {
                 setError('create-card-error');
             })
             .finally(() => {

@@ -1,7 +1,7 @@
 export default {
   checkSession: () => {
     return fetch("/api/session")
-      .catch((err) => Promise.reject({ error: "network-error" }))
+      .catch((_err) => Promise.reject({ error: "network-error" }))
       .then((response) => {
         if (!response.ok) {
           return response.json().then((err) => Promise.reject(err));
@@ -18,7 +18,7 @@ export default {
       },
       body: JSON.stringify({ username, password }),
     })
-      .catch((err) => Promise.reject({ error: "network-error" }))
+      .catch((_err) => Promise.reject({ error: "network-error" }))
       .then((response) => {
         if (!response.ok) {
           return response.json().then((err) => Promise.reject(err));
@@ -35,7 +35,7 @@ export default {
       },
       body: JSON.stringify({ username, password }),
     })
-      .catch((err) => Promise.reject({ error: "network-error" }))
+      .catch((_err) => Promise.reject({ error: "network-error" }))
       .then((response) => {
         if (!response.ok) {
           return response.json().then((err) => Promise.reject(err));
@@ -48,7 +48,7 @@ export default {
     return fetch("/api/session", {
       method: "DELETE",
     })
-      .catch((err) => Promise.reject({ error: "network-error" }))
+      .catch((_err) => Promise.reject({ error: "network-error" }))
       .then((response) => {
         if (!response.ok) {
           return response.json().then((err) => Promise.reject(err));
@@ -63,7 +63,7 @@ export default {
       : `/api/cards?status=${status}`;
       
     return fetch(url)
-      .catch((err) => Promise.reject({ error: "network-error" }))
+      .catch((_err) => Promise.reject({ error: "network-error" }))
       .then((response) => {
         if (!response.ok) {
           return response.json().then((err) => Promise.reject(err));
@@ -80,7 +80,7 @@ export default {
       },
       body: JSON.stringify({ front, explain, expireDays }),
     })
-      .catch((err) => Promise.reject({ error: "network-error" }))
+      .catch((_err) => Promise.reject({ error: "network-error" }))
       .then((response) => {
         if (!response.ok) {
           return response.json().then((err) => Promise.reject(err));
@@ -97,7 +97,7 @@ export default {
       },
       body: JSON.stringify(updates),
     })
-      .catch((err) => Promise.reject({ error: "network-error" }))
+      .catch((_err) => Promise.reject({ error: "network-error" }))
       .then((response) => {
         if (!response.ok) {
           return response.json().then((err) => Promise.reject(err));
@@ -110,7 +110,7 @@ export default {
     return fetch(`/api/card/${cardId}`, {
       method: "DELETE",
     })
-      .catch((err) => Promise.reject({ error: "network-error" }))
+      .catch((_err) => Promise.reject({ error: "network-error" }))
       .then((response) => {
         if (!response.ok) {
           return response.json().then((err) => Promise.reject(err));
@@ -121,7 +121,7 @@ export default {
 
   getNextCard: () => {
     return fetch("/api/cards/next")
-      .catch((err) => Promise.reject({ error: "network-error" }))
+      .catch((_err) => Promise.reject({ error: "network-error" }))
       .then((response) => {
         if (!response.ok) {
           return response.json().then((err) => Promise.reject(err));
@@ -138,7 +138,7 @@ export default {
       },
       body: JSON.stringify({ reviewOption }),
     })
-      .catch((err) => Promise.reject({ error: "network-error" }))
+      .catch((_err) => Promise.reject({ error: "network-error" }))
       .then((response) => {
         if (!response.ok) {
           return response.json().then((err) => Promise.reject(err));
@@ -149,7 +149,7 @@ export default {
 
   getCardStats: () => {
     return fetch("/api/cards/stats")
-      .catch((err) => Promise.reject({ error: "network-error" }))
+      .catch((_err) => Promise.reject({ error: "network-error" }))
       .then((response) => {
         if (!response.ok) {
           return response.json().then((err) => Promise.reject(err));

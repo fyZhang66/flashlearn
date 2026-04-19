@@ -1,0 +1,71 @@
+name: CD
+
+# Triggered after CI finishes successfully on main. Runs on a self-hosted
+# runner installed on the developer's laptop so it can reach the local
+# kind cluster. See docs/CICD.md for runner registration.
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: [main]
+
+concurrency:
+  group: cd
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  packages: read
+
+jobs:
+  deploy:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: self-hosted
+    env:
+      CLUSTER_CONTEXT: kind-flashlearn
+      NAMESPACE: flashlearn
+      DEPLOYMENT: app
+      CONTAINER: app
+    steps:
+      - name: Resolve image
+        id: img
+        run: |
+          owner="${GITHUB_REPOSITORY_OWNER,,}"
+          sha="${{ github.event.workflow_run.head_sha }}"
+          echo "image=ghcr.io/${owner}/flashlearn:${sha}" >> "$GITHUB_OUTPUT"
+          echo "sha=${sha}" >> "$GITHUB_OUTPUT"
+
+      - name: Log in to GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+
+      - name: Pull image
+        run: docker pull "${{ steps.img.outputs.image }}"
+
+      - name: Load into kind
+        run: kind load docker-image "${{ steps.img.outputs.image }}" --name flashlearn
+
+      - name: Roll out new image
+        run: |
+          kubectl --context "$CLUSTER_CONTEXT" -n "$NAMESPACE" \
+            set image "deployment/$DEPLOYMENT" \
+            "$CONTAINER=${{ steps.img.outputs.image }}"
+
+      - name: Annotate rollout with SHA
+        run: |
+          kubectl --context "$CLUSTER_CONTEXT" -n "$NAMESPACE" annotate \
+            "deployment/$DEPLOYMENT" \
+            "kubernetes.io/change-cause=CD deploy ${{ steps.img.outputs.sha }}" \
+            --overwrite
+
+      - name: Wait for rollout
+        run: |
+          kubectl --context "$CLUSTER_CONTEXT" -n "$NAMESPACE" \
+            rollout status "deployment/$DEPLOYMENT" --timeout=300s
+
+      - name: Summarize
+        if: always()
+        run: |
+          echo "### Deploy result" >> "$GITHUB_STEP_SUMMARY"
+          echo "- image: \`${{ steps.img.outputs.image }}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- status: $(kubectl --context "$CLUSTER_CONTEXT" -n "$NAMESPACE" get deploy "$DEPLOYMENT" -o jsonpath='{.status.conditions[-1].message}')" >> "$GITHUB_STEP_SUMMARY"

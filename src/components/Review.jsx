@@ -50,7 +50,7 @@ function Review() {
                 }
                 setIsLoading(false);
             })
-            .catch(err => {
+            .catch((_err) => {
                 setError('load-card-error');
                 setIsLoading(false);
             });
@@ -70,7 +70,7 @@ function Review() {
                 setStats(data.stats);
                 fetchNextCard();
             })
-            .catch(err => {
+            .catch((_err) => {
                 setError('review-card-error');
             });
     };
