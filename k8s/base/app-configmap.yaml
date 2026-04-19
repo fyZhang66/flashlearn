@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-config
+  namespace: flashlearn
+data:
+  NODE_ENV: "production"
+  PORT: "3000"
+  LOG_LEVEL: "info"
+  OTEL_SERVICE_NAME: "flashlearn"
+  # Points at the in-cluster otel-collector if you install one; otherwise
+  # traces are silently dropped because telemetry.js treats export as
+  # best-effort.
+  OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector.observability.svc.cluster.local:4318"
