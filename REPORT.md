@@ -26,7 +26,7 @@ to grow up:
 | --------------------------------------------- | ----------------------------------- |
 | In-memory stores → **Postgres** (users, sessions, cards) | So data survives a container restart, rolling update, or HPA scale event. Without this, every DevOps demo is hollow. |
 | Password-less sessions → **bcrypt-hashed passwords** | Real auth gives me real test cases (`bad-password` vs `no-such-user`) and a real login-attempt metric. |
-| `/healthz`, `/readyz`, `/metrics`             | Kubernetes probes and Prometheus scrape need them to do anything useful. |
+| `/livez`, `/readyz`, `/metrics`               | Kubernetes probes and Prometheus scrape need them to do anything useful. (`/livez` not `/healthz` because ingress-nginx reserves `/healthz`.) |
 | `console.log` → **pino JSON logs**            | Fluent Bit picks structured logs up for free; Kibana's filters work because fields are typed. |
 | No tracing → **OpenTelemetry auto-instrumentation** | One `--import ./telemetry.js` flag and every Express route + `pg` query is a span in Jaeger. |
 | No tests → **17 vitest + supertest tests** against a real DB | CI has something to run; the tests gave me confidence to rewrite the repos. |
@@ -41,7 +41,7 @@ dev) and runs the Vite build, then a thin `node:20-alpine` runtime stage
 copies only the pieces it needs. bcrypt's native binding is built in
 both stages and the dev build deps are deleted from the final image.
 Final size is ~585 MB — dominated by the Node base + native compilers I
-couldn't fully purge. `HEALTHCHECK` hits `/healthz`; `tini` is PID 1 so
+couldn't fully purge. `HEALTHCHECK` hits `/livez`; `tini` is PID 1 so
 signals get forwarded cleanly; `USER node` means the process doesn't
 run as root.
 

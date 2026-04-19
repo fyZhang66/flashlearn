@@ -63,7 +63,7 @@ spec:
                   key: DATABASE_URL
           startupProbe:
             httpGet:
-              path: /healthz
+              path: /livez
               port: http
             failureThreshold: 30
             periodSeconds: 2
@@ -75,7 +75,7 @@ spec:
             failureThreshold: 3
           livenessProbe:
             httpGet:
-              path: /healthz
+              path: /livez
               port: http
             periodSeconds: 10
             failureThreshold: 3

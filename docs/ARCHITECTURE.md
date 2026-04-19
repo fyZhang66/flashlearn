@@ -23,7 +23,7 @@ Two runtime modes ship side-by-side:
          ┌──────────────────┐               │
          │   app (Node 20)  │────metrics────┤
          │  /api/*  /dist/  │               │
-         │  /healthz /readyz│               │
+         │  /livez /readyz  │               │
          │  /metrics        │               │
          └─────┬──────┬─────┘               │
                │      │                     │
@@ -96,7 +96,7 @@ Host (macOS)                kind cluster (in Docker)
                            │                 │                    │
                            │  ┌──────────────▼───────────────┐    │
                            │  │  Deployment: app (2 replicas)│    │
-                           │  │  startup / readyz / healthz  │    │
+                           │  │  startup / readyz / livez    │    │
                            │  │  HPA 2→6 on CPU              │    │
                            │  └──────────────┬───────────────┘    │
                            │                 │                    │
@@ -140,7 +140,9 @@ Key points:
   actually applies, the others no-op and exit 0.
 - **Probes** match the reality of the app: `startupProbe` to absorb slow
   cold starts, `readinessProbe` that actually pings the DB (`/readyz`),
-  `livenessProbe` that's cheap (`/healthz`).
+  `livenessProbe` that's cheap (`/livez`). (We use `/livez` not `/healthz`
+  because ingress-nginx reserves `/healthz` on port 80 for its own
+  controller probe and won't forward it to backends.)
 - **`preStop` sleep** so a pod being removed from the Service finishes
   in-flight requests instead of dropping them.
 - **HPA on CPU** (2→6 replicas at 60% target). Requires metrics-server

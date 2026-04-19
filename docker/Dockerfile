@@ -44,9 +44,9 @@ COPY --from=builder /app/user-management.js  ./user-management.js
 
 EXPOSE 3000
 
-# Liveness: hit our own /healthz.
+# Liveness: hit our own /livez (/healthz is reserved by ingress-nginx).
 HEALTHCHECK --interval=15s --timeout=3s --start-period=10s --retries=3 \
-  CMD curl -fsS http://localhost:3000/healthz || exit 1
+  CMD curl -fsS http://localhost:3000/livez || exit 1
 
 USER node
 ENTRYPOINT ["/sbin/tini", "--"]

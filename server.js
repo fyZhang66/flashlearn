@@ -24,7 +24,7 @@ app.use(
     // Skip noisy probe / metrics routes from access logs.
     autoLogging: {
       ignore: (req) =>
-        req.url === "/healthz" ||
+        req.url === "/livez" ||
         req.url === "/readyz" ||
         req.url === "/metrics",
     },
@@ -36,7 +36,10 @@ app.use(cookieParser());
 app.use(express.json());
 
 // ── Probes ──────────────────────────────────────────────────────────────
-app.get("/healthz", (_req, res) => {
+// Note: path is /livez, not /healthz, because ingress-nginx reserves
+// /healthz on port 80 for its own controller-level probe and returns an
+// empty 200 text/html before forwarding traffic to user backends.
+app.get("/livez", (_req, res) => {
   res.json({ status: "ok" });
 });
 

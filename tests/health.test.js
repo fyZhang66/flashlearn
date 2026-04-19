@@ -12,8 +12,8 @@ afterAll(async () => {
 });
 
 describe("probes and metrics", () => {
-  it("/healthz returns ok", async () => {
-    const res = await request(app).get("/healthz");
+  it("/livez returns ok", async () => {
+    const res = await request(app).get("/livez");
     expect(res.status).toBe(200);
     expect(res.body.status).toBe("ok");
   });
@@ -26,7 +26,7 @@ describe("probes and metrics", () => {
 
   it("/metrics exposes Prometheus text", async () => {
     // Warm one request so http_requests_total has data.
-    await request(app).get("/healthz");
+    await request(app).get("/livez");
     const res = await request(app).get("/metrics");
     expect(res.status).toBe(200);
     expect(res.text).toContain("http_requests_total");

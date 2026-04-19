@@ -24,7 +24,7 @@ Verify everything is live:
 
 ```bash
 docker compose ps         # all Up / (healthy)
-curl http://localhost:3000/healthz        # liveness
+curl http://localhost:3000/livez          # liveness
 curl http://localhost:3000/readyz         # readiness
 curl http://localhost:3000/metrics | head # prom metrics
 ```
@@ -78,7 +78,7 @@ kubectl --context kind-flashlearn -n flashlearn describe deploy app | less
 Point out:
 
 - Probes (startup / readiness hits /readyz and fails if the DB is down /
-  liveness on /healthz)
+  liveness on /livez)
 - Resource requests + limits
 - HPA min/max + metrics target
 - `kubernetes.io/change-cause` annotation on the deployment — set by
