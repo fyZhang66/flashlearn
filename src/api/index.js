@@ -10,13 +10,13 @@ export default {
       });
   },
 
-  login: (username) => {
+  login: (username, password) => {
     return fetch("/api/session", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ username }),
+      body: JSON.stringify({ username, password }),
     })
       .catch((err) => Promise.reject({ error: "network-error" }))
       .then((response) => {
@@ -27,13 +27,13 @@ export default {
       });
   },
 
-  register: (username) => {
+  register: (username, password) => {
     return fetch("/api/register", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ username }),
+      body: JSON.stringify({ username, password }),
     })
       .catch((err) => Promise.reject({ error: "network-error" }))
       .then((response) => {

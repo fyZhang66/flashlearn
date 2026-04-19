@@ -1,18 +1,19 @@
-import sessions from "./sessions.js";
+import { getSessionUser } from "./sessions.js";
 
-const requireAuth = (req, res, next) => {
-  const sid = req.cookies.sid;
-  const username = sid ? sessions.getSessionUser(sid) : "";
-
-  if (!sid || !username) {
-    res.status(401).send("auth-missing");
-    return;
+export default async function requireAuth(req, res, next) {
+  try {
+    const sid = req.cookies?.sid;
+    const user = await getSessionUser(sid);
+    if (!user) {
+      res.status(401).json({ error: "auth-missing" });
+      return;
+    }
+    req.user = user;
+    req.username = user.username;
+    req.userId = user.id;
+    req.sid = sid;
+    next();
+  } catch (err) {
+    next(err);
   }
-
-  req.username = username;
-  req.sid = sid;
-
-  next();
-};
-
-export default requireAuth;
+}

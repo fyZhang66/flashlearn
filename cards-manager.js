@@ -1,184 +1,173 @@
-import crypto from "node:crypto";
-import userManagement from "./user-management.js";
-const uuid = crypto.randomUUID;
-const cardsFor = {};
+import { pool } from "./db.js";
 
-const { isValidUsername, isUserRegistered, registerUser } = userManagement;
-
-function initCardsForUser(username) {
-  if(!cardsFor[username]) {
-    cardsFor[username] = [];
-  }
-  return cardsFor[username];
-}
-
-function registerUserWithCards(username) {
-  const registered = registerUser(username);
-  if (registered) {
-    initCardsForUser(username);
-  }
-  return registered;
-}
-
-function addCard(username, front, explain, expireDays = 7) {
-  if(!cardsFor[username]) {
-    initCardsForUser(username);
-  }
-  
-  const cardId = uuid();
-  const expireMs = expireDays * 24 * 60 * 60 * 1000;
-  
-  const card = {
-    cardId,
-    front,
-    explain,
-    expireMs,
-    createdAt: new Date().toISOString(),
-    lastReviewed: null
+function mapRow(row) {
+  if (!row) return null;
+  return {
+    cardId: row.id,
+    front: row.front,
+    explain: row.explain,
+    expireMs: Number(row.expire_ms),
+    createdAt: row.created_at?.toISOString?.() ?? row.created_at,
+    lastReviewed: row.last_reviewed
+      ? row.last_reviewed.toISOString?.() ?? row.last_reviewed
+      : null,
   };
-  
-  cardsFor[username].push(card);
-  return card;
 }
 
-function getCards(username) {
-  return cardsFor[username] || [];
+export async function addCard(userId, front, explain, expireDays = 7) {
+  const expireMs = Number(expireDays) * 24 * 60 * 60 * 1000;
+  const { rows } = await pool.query(
+    `INSERT INTO cards (user_id, front, explain, expire_ms)
+     VALUES ($1, $2, $3, $4)
+     RETURNING *`,
+    [userId, front, explain, expireMs],
+  );
+  return mapRow(rows[0]);
 }
 
-function getCardsByStatus(username, status) {
-  let cards = getCards(username);
-  
-  if (status === 'unlearned') {
-    cards = cards.filter(card => !card.lastReviewed);
-  } else if (status === 'due') {
-    cards = getDueCards(username);
-  } else if (status === 'learned') {
-    const now = new Date();
-    cards = cards.filter(card => {
-      if (!card.lastReviewed) return false;
-      const lastReviewed = new Date(card.lastReviewed);
-      const dueDate = new Date(lastReviewed);
-      dueDate.setTime(dueDate.getTime() + card.expireMs);
-      return now < dueDate;
-    });
-  } else{
-    cards = getCards(username);
+export async function getCards(userId) {
+  const { rows } = await pool.query(
+    `SELECT * FROM cards WHERE user_id = $1 ORDER BY created_at DESC`,
+    [userId],
+  );
+  return rows.map(mapRow);
+}
+
+export async function getCardsByStatus(userId, status) {
+  if (status === "unlearned") {
+    const { rows } = await pool.query(
+      `SELECT * FROM cards
+        WHERE user_id = $1 AND last_reviewed IS NULL
+        ORDER BY created_at DESC`,
+      [userId],
+    );
+    return rows.map(mapRow);
   }
-  return cards;
+  if (status === "due") {
+    return getDueCards(userId);
+  }
+  if (status === "learned") {
+    const { rows } = await pool.query(
+      `SELECT * FROM cards
+        WHERE user_id = $1
+          AND last_reviewed IS NOT NULL
+          AND last_reviewed + (expire_ms || ' milliseconds')::interval > NOW()
+        ORDER BY created_at DESC`,
+      [userId],
+    );
+    return rows.map(mapRow);
+  }
+  return getCards(userId);
 }
 
-function getCard(username, cardId) {
-  if(!cardsFor[username]) return null;
-  return cardsFor[username].find(card => card.cardId === cardId);
+export async function getCard(userId, cardId) {
+  const { rows } = await pool.query(
+    `SELECT * FROM cards WHERE user_id = $1 AND id = $2`,
+    [userId, cardId],
+  );
+  return mapRow(rows[0]);
 }
 
-function updateCard(username, cardId, updates) {
-  if(!cardsFor[username]) return null;
-  
-  const index = cardsFor[username].findIndex(card => card.cardId === cardId);
-  if(index === -1) return null;
-  
-  const card = cardsFor[username][index];
-  const updatedCard = { ...card, ...updates };
-  cardsFor[username][index] = updatedCard;
-  
-  return updatedCard;
+export async function updateCard(userId, cardId, updates) {
+  const fields = [];
+  const values = [];
+  let i = 1;
+  if (updates.front !== undefined) {
+    fields.push(`front = $${i++}`);
+    values.push(updates.front);
+  }
+  if (updates.explain !== undefined) {
+    fields.push(`explain = $${i++}`);
+    values.push(updates.explain);
+  }
+  if (updates.expireMs !== undefined) {
+    fields.push(`expire_ms = $${i++}`);
+    values.push(updates.expireMs);
+  }
+  if (updates.lastReviewed !== undefined) {
+    fields.push(`last_reviewed = $${i++}`);
+    values.push(updates.lastReviewed);
+  }
+  if (fields.length === 0) return getCard(userId, cardId);
+
+  values.push(userId, cardId);
+  const { rows } = await pool.query(
+    `UPDATE cards SET ${fields.join(", ")}
+      WHERE user_id = $${i++} AND id = $${i}
+      RETURNING *`,
+    values,
+  );
+  return mapRow(rows[0]);
 }
 
-function deleteCard(username, cardId) {
-  if(!cardsFor[username]) return false;
-  const initialLength = cardsFor[username].length;
-  cardsFor[username] = cardsFor[username].filter(card => card.cardId !== cardId);
-  
-  return cardsFor[username].length !== initialLength;
+export async function deleteCard(userId, cardId) {
+  const { rowCount } = await pool.query(
+    `DELETE FROM cards WHERE user_id = $1 AND id = $2`,
+    [userId, cardId],
+  );
+  return rowCount > 0;
 }
 
-function reviewCard(username, cardId, reviewOption = 'easy') {
-  if(!cardsFor[username]) return null;
-  
-  const card = getCard(username, cardId);
-  if(!card) return null;
-  
-  const now = new Date();
-  const updates = {
-    lastReviewed: now.toISOString()
-  };
-  
-  switch(reviewOption) {
-    case 'hard':
-      //  5 minutes
-      updates.expireMs = 300000;
+export async function reviewCard(userId, cardId, reviewOption = "easy") {
+  const card = await getCard(userId, cardId);
+  if (!card) return null;
+
+  const updates = { lastReviewed: new Date() };
+  switch (reviewOption) {
+    case "hard":
+      updates.expireMs = 5 * 60 * 1000;
       break;
-    case 'good':
-      //  1 day
-      updates.expireMs = 86400000;
+    case "good":
+      updates.expireMs = 24 * 60 * 60 * 1000;
       break;
-    case 'easy':
+    case "easy":
     default:
       updates.expireMs = card.expireMs * 2;
       break;
   }
-  
-  return updateCard(username, cardId, updates);
+  return updateCard(userId, cardId, updates);
 }
 
-
-function getDueCards(username) {
-  if(!cardsFor[username]) return [];
-  
-  const now = new Date();
-  return cardsFor[username].filter(card => {
-    if(!card.lastReviewed) return true; 
-    
-    const lastReviewed = new Date(card.lastReviewed);
-    const dueDate = new Date(lastReviewed);
-    
-    dueDate.setTime(dueDate.getTime() + card.expireMs);
-    
-    return now >= dueDate;
-  });
+export async function getDueCards(userId) {
+  const { rows } = await pool.query(
+    `SELECT * FROM cards
+      WHERE user_id = $1
+        AND (
+          last_reviewed IS NULL
+          OR last_reviewed + (expire_ms || ' milliseconds')::interval <= NOW()
+        )
+      ORDER BY COALESCE(last_reviewed, created_at) ASC`,
+    [userId],
+  );
+  return rows.map(mapRow);
 }
 
-
-function getUnlearnedCount(username) {
-  if(!cardsFor[username]) return 0;
-  
-  return cardsFor[username].filter(card => !card.lastReviewed).length;
-}
-
-
-function getDueCount(username) {
-  return getDueCards(username).length;
-}
-
-
-function getCardStats(username) {
-  if(!cardsFor[username]) {
-    return {
-      total: 0,
-      unlearned: 0,
-      due: 0
-    };
-  }
-  
-  const total = cardsFor[username].length;
-  const unlearned = getUnlearnedCount(username);
-  const due = getDueCount(username);
-  
+export async function getCardStats(userId) {
+  const { rows } = await pool.query(
+    `SELECT
+       COUNT(*)                                                       AS total,
+       COUNT(*) FILTER (WHERE last_reviewed IS NULL)                  AS unlearned,
+       COUNT(*) FILTER (
+         WHERE last_reviewed IS NULL
+            OR last_reviewed + (expire_ms || ' milliseconds')::interval <= NOW()
+       )                                                              AS due
+     FROM cards
+     WHERE user_id = $1`,
+    [userId],
+  );
+  const r = rows[0];
   return {
-    total,
-    unlearned,
-    due
+    total: Number(r.total),
+    unlearned: Number(r.unlearned),
+    due: Number(r.due),
   };
 }
 
 export default {
-  isValidUsername,
-  isUserRegistered,
-  registerUserWithCards,
-  initCardsForUser,
   addCard,
+  getCards,
   getCardsByStatus,
+  getCard,
   updateCard,
   deleteCard,
   reviewCard,

@@ -1,55 +1,71 @@
-import express from 'express';
-import sessions from '../sessions.js';
-import cardsManager from '../cards-manager.js';
+import express from "express";
+import * as sessions from "../sessions.js";
+import * as users from "../user-management.js";
+import { loginAttemptsTotal } from "../metrics.js";
 
 const router = express.Router();
 
-router.get("/", (req, res) => {
-  const sid = req.cookies.sid;
-  const username = sid ? sessions.getSessionUser(sid) : "";
-  if (!sid || !username) {
-    res.status(401).json({ error: "auth-missing" });
-    return;
+router.get("/", async (req, res, next) => {
+  try {
+    const user = await sessions.getSessionUser(req.cookies?.sid);
+    if (!user) {
+      res.status(401).json({ error: "auth-missing" });
+      return;
+    }
+    res.json({ username: user.username });
+  } catch (err) {
+    next(err);
   }
-  res.json({ username });
 });
 
-router.post("/", (req, res) => {
-  const { username } = req.body;
+router.post("/", async (req, res, next) => {
+  try {
+    const { username, password } = req.body || {};
 
-  if (!cardsManager.isValidUsername(username)) {
-    res.status(400).json({ error: "required-username" });
-    return;
+    if (!users.isValidUsername(username)) {
+      loginAttemptsTotal.inc({ outcome: "invalid-username" });
+      res.status(400).json({ error: "required-username" });
+      return;
+    }
+    if (!users.isValidPassword(password)) {
+      loginAttemptsTotal.inc({ outcome: "invalid-password" });
+      res.status(400).json({ error: "required-password" });
+      return;
+    }
+
+    const user = await users.verifyPassword(username, password);
+    if (!user) {
+      const registered = await users.isUserRegistered(username);
+      loginAttemptsTotal.inc({
+        outcome: registered ? "bad-password" : "no-such-user",
+      });
+      res.status(401).json({
+        error: registered ? "bad-password" : "user-not-registered",
+      });
+      return;
+    }
+
+    const sid = await sessions.addSession(user.id);
+    res.cookie("sid", sid, { httpOnly: true, sameSite: "lax" });
+    loginAttemptsTotal.inc({ outcome: "success" });
+    res.json({ username: user.username });
+  } catch (err) {
+    next(err);
   }
-
-  if (username === "dog") {
-    res.status(403).json({ error: "auth-insufficient" });
-    return;
-  }
-
-  if (!cardsManager.isUserRegistered(username)) {
-    res.status(401).json({ error: "user-not-registered" });
-    return;
-  }
-
-  const sid = sessions.addSession(username);
-  res.cookie("sid", sid);
-  res.json({ username });
 });
 
-router.delete("/", (req, res) => {
-  const sid = req.cookies.sid;
-  const username = sid ? sessions.getSessionUser(sid) : "";
-
-  if (sid) {
-    res.clearCookie("sid");
+router.delete("/", async (req, res, next) => {
+  try {
+    const sid = req.cookies?.sid;
+    const user = await sessions.getSessionUser(sid);
+    if (sid) {
+      await sessions.deleteSession(sid);
+      res.clearCookie("sid");
+    }
+    res.json({ wasLoggedIn: !!user });
+  } catch (err) {
+    next(err);
   }
-
-  if (username) {
-    sessions.deleteSession(sid);
-  }
-
-  res.json({ wasLoggedIn: !!username });
 });
 
 export default router;

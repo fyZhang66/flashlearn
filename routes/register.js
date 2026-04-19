@@ -1,27 +1,37 @@
-import express from 'express';
-import cardsManager from '../cards-manager.js';
+import express from "express";
+import * as users from "../user-management.js";
+import { userRegistrationsTotal } from "../metrics.js";
 
 const router = express.Router();
 
-router.post("/", (req, res) => {
-  const { username } = req.body;
+router.post("/", async (req, res, next) => {
+  try {
+    const { username, password } = req.body || {};
 
-  if (!cardsManager.isValidUsername(username)) {
-    res.status(400).json({ error: "required-username" });
-    return;
+    if (!users.isValidUsername(username)) {
+      res.status(400).json({ error: "required-username" });
+      return;
+    }
+    if (!users.isValidPassword(password)) {
+      res.status(400).json({ error: "required-password" });
+      return;
+    }
+
+    const created = await users.registerUser(username, password);
+    if (!created) {
+      res.status(409).json({ error: "username-already-exists" });
+      return;
+    }
+
+    userRegistrationsTotal.inc();
+    res.json({
+      success: true,
+      username: created.username,
+      message: "Account created successfully. Please log in.",
+    });
+  } catch (err) {
+    next(err);
   }
-  
-  if (cardsManager.isUserRegistered(username)) {
-    res.status(409).json({ error: "username-already-exists" });
-    return;
-  }
-  cardsManager.registerUserWithCards(username);
-  
-  res.json({ 
-    success: true, 
-    username,
-    message: "Account created successfully. Please log in."
-  });
 });
 
 export default router;
