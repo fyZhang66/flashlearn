@@ -56,10 +56,11 @@ jobs:
         # Overwrite the checkout's kustomization.yaml so the generated
         # manifests reference this exact SHA. The edit is ephemeral (the
         # runner workspace is discarded); the committed file stays at
-        # `:latest`.
+        # `:latest`. Using perl instead of sed because BSD sed on the
+        # macOS self-hosted runner mis-parses `sed -i -E`.
         working-directory: ${{ env.OVERLAY }}
         run: |
-          sed -i -E "s#(newTag:).*#\\1 ${{ steps.img.outputs.sha }}#" kustomization.yaml
+          perl -i -pe 's#(newTag:).*#$1 ${{ steps.img.outputs.sha }}#' kustomization.yaml
           cat kustomization.yaml
 
       - name: Reconcile manifests
